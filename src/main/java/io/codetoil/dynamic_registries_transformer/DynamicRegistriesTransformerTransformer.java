@@ -49,6 +49,6 @@ public record DynamicRegistriesTransformerTransformer<T>(Predicate<String> isTop
 
     @Override
     public String[] labels() {
-        return new String[]{"Dynamic Registries Core"};
+        return new String[]{"Dynamic Registries Transformer"};
     }
 }

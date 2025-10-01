@@ -12,7 +12,7 @@ import java.util.Set;
 public class DynamicRegistriesTransformerTransformationService implements ITransformationService {
     @Override
     public @NotNull String name() {
-        return "Dynamic Registries Core Transformation Service";
+        return "Dynamic Registries Transformer Transformation Service";
     }
 
     @Override
