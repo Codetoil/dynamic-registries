@@ -37,7 +37,7 @@ public record DataProviderDynamicRegistries<O>(PackOutput output,
                                 assert o != null;
                                 return (Class<O>) o.getClass();
                             }),
-                    childClass -> dynamicRegistriesObjectHelper.getClassByteArray(childClass, parentClass));
+                    childClass -> dynamicRegistriesObjectHelper.getClassByteArray(childClass));
             DynamicRegistries.LOGGER.info("Finished generating {}", dynamicRegistriesObjectHelper.getId());
 
             return DataProvider.saveAll(cachedOutput, Codec.list(Codec.BYTE), (object) ->

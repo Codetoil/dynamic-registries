@@ -2,6 +2,7 @@ package io.codetoil.dynamic_registries.api;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import io.codetoil.dynamic_registries.DynamicRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -10,8 +11,8 @@ import org.jetbrains.annotations.NotNull;
 import org.objectweb.asm.*;
 
 import java.lang.reflect.Constructor;
-import java.util.Arrays;
-import java.util.Map;
+import java.lang.reflect.Method;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -33,15 +34,23 @@ public class DynamicRegistriesObjectHelper<P> {
         return id;
     }
 
-    public <A extends P> byte[] getClassByteArray(Class<A> originalClass, Class<P> parentClass) {
+    public <A extends P> byte[] getClassByteArray(Class<A> originalClass) {
         if (byteArrayMap.containsKey(originalClass)) {
             return byteArrayMap.get(originalClass);
         }
-        return generateClassByteArray(originalClass, parentClass);
+        return generateClassByteArray(originalClass);
     }
 
-    private <C extends P> byte[] generateClassByteArray(Class<C> childClass, Class<P> parentClass) {
-        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
+    private void visitConstructorFrame(MethodVisitor constructorVisitor, List<Object> frameLocals,
+                                       Stack<Object> frameStack) {
+        Object[] frameLocalsArray = frameLocals.stream().filter(Objects::nonNull).toArray();
+        Object[] frameStackArray = frameStack.toArray();
+        constructorVisitor.visitFrame(Opcodes.F_NEW, frameLocalsArray.length, frameLocalsArray,
+                frameStackArray.length, frameStackArray);
+    }
+
+    private <C extends P> byte[] generateClassByteArray(Class<C> childClass) {
+        ClassWriter classWriter = new ClassWriter(0);
 
         classWriter.visit(
                 Opcodes.V21,
@@ -62,28 +71,71 @@ public class DynamicRegistriesObjectHelper<P> {
 
         Label startConstructorParameters = new Label();
         Label endConstructorParameters = new Label();
+        constructorVisitor.visitLineNumber(5, startConstructorParameters);
+        constructorVisitor.visitLineNumber(6, endConstructorParameters);
         constructorVisitor.visitLocalVariable("constructorParameters", Object[].class.descriptorString(),
                 null, startConstructorParameters, endConstructorParameters, 2);
 
+        List<Object> frameLocalTypes = new ArrayList<>(3);
+        frameLocalTypes.addLast(null);
+        frameLocalTypes.addLast(null);
+        frameLocalTypes.addLast(null);
+        Stack<Object> frameStackTypes = new Stack<>();
+
         constructorVisitor.visitCode();
+        frameLocalTypes.set(0, Opcodes.UNINITIALIZED_THIS);
+        frameLocalTypes.set(1, Type.getInternalName(childClass));
+
         constructorVisitor.visitVarInsn(Opcodes.ALOAD, 0);
+        frameStackTypes.push(frameLocalTypes.getFirst());
+        visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
+
         constructorVisitor.visitLdcInsn(Type.getType(childClass));
+        frameStackTypes.push(Type.getInternalName(childClass));
+        visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
+
         constructorVisitor.visitVarInsn(Opcodes.ALOAD, 1);
+        frameStackTypes.push(frameLocalTypes.get(1));
+        visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
+
         constructorVisitor.visitMethodInsn(Opcodes.INVOKESTATIC,
                 "io/codetoil/dynamic_registries/DynamicRegistriesObjectHelper",
                 "createConstructorParameters",
-                "(Ljava/lang/Class<"
-                        + childClass.descriptorString() + ">;" + childClass.descriptorString() + ")["
-                        + "Ljava/lang/Object;",
+                "(Ljava/lang/Class<" + childClass.descriptorString() + ">;"
+                        + childClass.descriptorString() + ")[Ljava/lang/Object;",
                 false);
+        frameStackTypes.pop();
+        frameStackTypes.pop();
+        frameStackTypes.push(Type.getInternalName(Object[].class));
+        visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
+
         constructorVisitor.visitLabel(startConstructorParameters);
         constructorVisitor.visitVarInsn(Opcodes.ASTORE, 2);
+        frameLocalTypes.set(2, frameStackTypes.pop());
+        visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
+
         for (int index = 0; index < getSelectedConstructor(childClass).getParameterCount(); index++) {
             constructorVisitor.visitVarInsn(Opcodes.ALOAD, 2);
+            frameStackTypes.push(frameLocalTypes.get(2));
+            visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
+
             constructorVisitor.visitIntInsn(Opcodes.SIPUSH, index); // Limited to Short.MAX_VALUE parameters.
+            frameStackTypes.push(Opcodes.INTEGER);
+            visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
+
             constructorVisitor.visitInsn(Opcodes.AALOAD);
+            frameStackTypes.pop();
+            frameStackTypes.pop();
+            frameStackTypes.push(Type.getInternalName(Object.class));
+            visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
+
             constructorVisitor.visitTypeInsn(Opcodes.CHECKCAST, getSelectedConstructor(childClass)
                     .getParameterTypes()[index].getName().replace('.', '/'));
+            frameStackTypes.pop();
+            frameStackTypes.push(Type.getInternalName(getSelectedConstructor(childClass)
+                    .getParameterTypes()[index]));
+            visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
+
             switch (getSelectedConstructor(childClass).getParameterTypes()[index].getName()) {
                 case "io.codetoil.dynamicregistries.DynamicRegistriesObjectHelper$ByteWrapper":
                     constructorVisitor.visitMethodInsn(Opcodes.INVOKESPECIAL,
@@ -91,48 +143,77 @@ public class DynamicRegistriesObjectHelper<P> {
                             "value",
                             "()B",
                             false);
+                    frameStackTypes.pop();
+                    frameStackTypes.push(10); // boolean Frane,ITEM_ASM_BYTE
+                    visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
                 case "io.codetoil.dynamicregistries.DynamicRegistriesObjectHelper$ShortWrapper":
                     constructorVisitor.visitMethodInsn(Opcodes.INVOKESPECIAL,
                             "io/codetoil/dynamic_registries/DynamicRegistriesObjectHelper$ShortWrapper",
                             "value",
                             "()S",
                             false);
+                    frameStackTypes.pop();
+                    frameStackTypes.push(12); // short, Frame.ITEM_ASM_SHORT
+                    visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
                 case "io.codetoil.dynamicregistries.DynamicRegistriesObjectHelper$IntWrapper":
                     constructorVisitor.visitMethodInsn(Opcodes.INVOKESPECIAL,
                             "io/codetoil/dynamic_registries/DynamicRegistriesObjectHelper$IntWrapper",
                             "value",
                             "()I",
                             false);
+                    frameStackTypes.pop();
+                    frameStackTypes.push(Opcodes.INTEGER);
+                    visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
                 case "io.codetoil.dynamicregistries.DynamicRegistriesObjectHelper$LongWrapper":
                     constructorVisitor.visitMethodInsn(Opcodes.INVOKESPECIAL,
                             "io/codetoil/dynamic_registries/DynamicRegistriesObjectHelper$LongWrapper",
                             "value",
                             "()J",
                             false);
+                    frameStackTypes.pop();
+                    frameStackTypes.push(Opcodes.LONG);
+                    visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
                 case "io.codetoil.dynamicregistries.DynamicRegistriesObjectHelper$CharWrapper":
                     constructorVisitor.visitMethodInsn(Opcodes.INVOKESPECIAL,
                             "io/codetoil/dynamic_registries/DynamicRegistriesObjectHelper$CharWrapper",
                             "value",
                             "()C",
                             false);
+                    frameStackTypes.pop();
+                    frameStackTypes.push(11); // char Frame.ITEM_ASM_CHAR
+                    visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
                 case "io.codetoil.dynamicregistries.DynamicRegistriesObjectHelper$FloatWrapper":
                     constructorVisitor.visitMethodInsn(Opcodes.INVOKESPECIAL,
                             "io/codetoil/dynamic_registries/DynamicRegistriesObjectHelper$FloatWrapper",
                             "value",
                             "()F",
                             false);
+                    frameStackTypes.pop();
+                    frameStackTypes.push(Opcodes.FLOAT);
+                    visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
                 case "io.codetoil.dynamicregistries.DynamicRegistriesObjectHelper$DoubleWrapper":
                     constructorVisitor.visitMethodInsn(Opcodes.INVOKESPECIAL,
                             "io/codetoil/dynamic_registries/DynamicRegistriesObjectHelper$DoubleWrapper",
                             "value",
                             "()D",
                             false);
+                    frameStackTypes.pop();
+                    frameStackTypes.push(Opcodes.DOUBLE);
+                    visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
                 case "io.codetoil.dynamicregistries.DynamicRegistriesObjectHelper$BooleanWrapper":
                     constructorVisitor.visitMethodInsn(Opcodes.INVOKESPECIAL,
                             "io/codetoil/dynamic_registries/DynamicRegistriesObjectHelper$BooleanWrapper",
                             "getValue",
                             "()Z",
                             false);
+                    frameStackTypes.pop();
+                    frameStackTypes.push(9); // boolean, Frame.ITEM_ASM_BOOLEAN
+                    visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
+                default:
+                    frameStackTypes.pop();
+                    frameStackTypes.push(Type.getInternalName(getSelectedConstructor(childClass)
+                            .getParameterTypes()[index]));
+                    visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
             }
         }
         constructorVisitor.visitLabel(endConstructorParameters);
@@ -144,9 +225,13 @@ public class DynamicRegistriesObjectHelper<P> {
                         Arrays.stream(getSelectedConstructor(childClass).getParameterTypes())
                                 .map(Class::descriptorString).collect(Collectors.joining()) + ")V",
                 false);
+        frameStackTypes.pop(); // this
+        Arrays.stream(getSelectedConstructor(childClass).getParameterTypes())
+                .forEach((a) -> frameStackTypes.pop());
+        visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
 
         constructorVisitor.visitInsn(Opcodes.RETURN);
-        constructorVisitor.visitMaxs(1, 1);
+        constructorVisitor.visitMaxs(10 + getSelectedConstructor(childClass).getParameterCount(), 3);
 
         classWriter.visitEnd();
         byte[] result = classWriter.toByteArray();
@@ -155,7 +240,7 @@ public class DynamicRegistriesObjectHelper<P> {
     }
 
     @SuppressWarnings("unused")
-    public @NotNull <A extends P> Class<A> getClass(Class<A> childClass, Class<P> parentClass) {
+    public @NotNull <A extends P> Class<A> getClass(Class<A> childClass) {
         if (classMap.containsKey(childClass)) {
             return (Class<A>) classMap.get(childClass);
         }
@@ -171,7 +256,7 @@ public class DynamicRegistriesObjectHelper<P> {
         } catch (ClassNotFoundException e) {
             objectClass = (Class<A>) DynamicRegistries.dynamicRegistriesDynamicClassLoader
                     .defineClass(className,
-                            getClassByteArray(childClass, parentClass));
+                            getClassByteArray(childClass));
         }
 
         classMap.put(childClass, objectClass);
