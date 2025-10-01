@@ -15,15 +15,15 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public class DynamicRegistriesObjectHelper<O> {
-    private final BiMap<Class<? extends O>, Class<? extends O>> classMap = HashBiMap.create();
-    private final Map<Class<? extends O>, byte[]> byteArrayMap = Maps.newHashMap();
-    private final Map<Class<? extends O>, Constructor<? extends O>> selectedConstructor
+public class DynamicRegistriesObjectHelper<P> {
+    private final BiMap<Class<? extends P>, Class<? extends P>> classMap = HashBiMap.create();
+    private final Map<Class<? extends P>, byte[]> byteArrayMap = Maps.newHashMap();
+    private final Map<Class<? extends P>, Constructor<? extends P>> selectedConstructor
             = Maps.newHashMap();
-    private final Function<Constructor<? extends O>, Function<O, Object>> constructorArguments;
+    private final Function<Constructor<? extends P>, Function<P, Object>> constructorArguments;
     private final ResourceLocation id;
 
-    public DynamicRegistriesObjectHelper(Function<Constructor<? extends O>, Function<O, Object>>
+    public DynamicRegistriesObjectHelper(Function<Constructor<? extends P>, Function<P, Object>>
                                                  constructorArguments, ResourceLocation id) {
         this.constructorArguments = constructorArguments;
         this.id = id;
@@ -33,30 +33,30 @@ public class DynamicRegistriesObjectHelper<O> {
         return id;
     }
 
-    public <A extends O> byte[] getClassByteArray(Class<A> originalClass) {
+    public <A extends P> byte[] getClassByteArray(Class<A> originalClass, Class<P> parentClass) {
         if (byteArrayMap.containsKey(originalClass)) {
             return byteArrayMap.get(originalClass);
         }
-        return generateClassByteArray(originalClass);
+        return generateClassByteArray(originalClass, parentClass);
     }
 
-    private <A extends O> byte[] generateClassByteArray(Class<A> originalClass) {
+    private <C extends P> byte[] generateClassByteArray(Class<C> childClass, Class<P> parentClass) {
         ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
 
         classWriter.visit(
                 Opcodes.V21,
                 Opcodes.ACC_PUBLIC,
-                "dynamic_registries_dynamic/"  + id.getNamespace() + "/" + id.getPath() +
-                        "/Dynamic" + originalClass.getName().replace('.', '_')
+                "dynamic_registries_dynamic/" + id.getNamespace() + "/" + id.getPath() +
+                        "/Dynamic" + childClass.getName().replace('.', '_')
                         .replace('$', '_'),
                 null,
-                originalClass.getName().replace('.', '/'),
+                childClass.getName().replace('.', '/'),
                 new String[]{});
 
         MethodVisitor constructorVisitor = classWriter.visitMethod(
                 Opcodes.ACC_PUBLIC,
                 "<init>",
-                "(" + originalClass.descriptorString() + ")V",
+                "(" + childClass.descriptorString() + ")V",
                 null,
                 null);
 
@@ -67,24 +67,24 @@ public class DynamicRegistriesObjectHelper<O> {
 
         constructorVisitor.visitCode();
         constructorVisitor.visitVarInsn(Opcodes.ALOAD, 0);
-        constructorVisitor.visitLdcInsn(Type.getType(originalClass));
+        constructorVisitor.visitLdcInsn(Type.getType(childClass));
         constructorVisitor.visitVarInsn(Opcodes.ALOAD, 1);
         constructorVisitor.visitMethodInsn(Opcodes.INVOKESTATIC,
                 "io/codetoil/dynamic_registries/DynamicRegistriesObjectHelper",
                 "createConstructorParameters",
-                "<A:" + originalClass.descriptorString() + ">(" + Class.class.descriptorString() + "<"
-                        + originalClass.descriptorString() + ">" + originalClass.descriptorString() + ")["
-                        + Object.class.descriptorString(),
+                "(Ljava/lang/Class<"
+                        + childClass.descriptorString() + ">;" + childClass.descriptorString() + ")["
+                        + "Ljava/lang/Object;",
                 false);
         constructorVisitor.visitLabel(startConstructorParameters);
         constructorVisitor.visitVarInsn(Opcodes.ASTORE, 2);
-        for (int index = 0; index < getSelectedConstructor(originalClass).getParameterCount(); index++) {
+        for (int index = 0; index < getSelectedConstructor(childClass).getParameterCount(); index++) {
             constructorVisitor.visitVarInsn(Opcodes.ALOAD, 2);
             constructorVisitor.visitIntInsn(Opcodes.SIPUSH, index); // Limited to Short.MAX_VALUE parameters.
             constructorVisitor.visitInsn(Opcodes.AALOAD);
-            constructorVisitor.visitTypeInsn(Opcodes.CHECKCAST, getSelectedConstructor(originalClass)
+            constructorVisitor.visitTypeInsn(Opcodes.CHECKCAST, getSelectedConstructor(childClass)
                     .getParameterTypes()[index].getName().replace('.', '/'));
-            switch (getSelectedConstructor(originalClass).getParameterTypes()[index].getName()) {
+            switch (getSelectedConstructor(childClass).getParameterTypes()[index].getName()) {
                 case "io.codetoil.dynamicregistries.DynamicRegistriesObjectHelper$ByteWrapper":
                     constructorVisitor.visitMethodInsn(Opcodes.INVOKESPECIAL,
                             "io/codetoil/dynamic_registries/DynamicRegistriesObjectHelper$ByteWrapper",
@@ -138,10 +138,10 @@ public class DynamicRegistriesObjectHelper<O> {
         constructorVisitor.visitLabel(endConstructorParameters);
 
         constructorVisitor.visitMethodInsn(Opcodes.INVOKESPECIAL,
-                originalClass.getName().replace('.', '/'),
+                childClass.getName().replace('.', '/'),
                 "<init>",
                 "(" +
-                        Arrays.stream(getSelectedConstructor(originalClass).getParameterTypes())
+                        Arrays.stream(getSelectedConstructor(childClass).getParameterTypes())
                                 .map(Class::descriptorString).collect(Collectors.joining()) + ")V",
                 false);
 
@@ -150,38 +150,38 @@ public class DynamicRegistriesObjectHelper<O> {
 
         classWriter.visitEnd();
         byte[] result = classWriter.toByteArray();
-        byteArrayMap.put(originalClass, result);
+        byteArrayMap.put(childClass, result);
         return result;
     }
 
-    public @NotNull <A extends O> Class<A> getClass(Class<A> originalClass)
-            throws IllegalAccessException {
-        if (classMap.containsKey(originalClass)) {
-            return (Class<A>) classMap.get(originalClass);
+    @SuppressWarnings("unused")
+    public @NotNull <A extends P> Class<A> getClass(Class<A> childClass, Class<P> parentClass) {
+        if (classMap.containsKey(childClass)) {
+            return (Class<A>) classMap.get(childClass);
         }
 
-        String purpuredItemClassName = "dynamic_registries_dynamic." + id.getNamespace() + "." + id.getPath()
-                + ".Dynamic" + originalClass.getName().replace('.', '_')
+        String className = "dynamic_registries_dynamic." + id.getNamespace() + "." + id.getPath()
+                + ".Dynamic" + childClass.getName().replace('.', '_')
                 .replace('$', '_');
 
-        Class<A> purpuredItemClass;
+        Class<A> objectClass;
         try {
-            purpuredItemClass = (Class<A>) DynamicRegistries.dynamicRegistriesDynamicClassLoader
-                    .loadClass(purpuredItemClassName);
+            objectClass = (Class<A>) DynamicRegistries.dynamicRegistriesDynamicClassLoader
+                    .loadClass(className);
         } catch (ClassNotFoundException e) {
-            purpuredItemClass = (Class<A>) DynamicRegistries.dynamicRegistriesDynamicClassLoader
-                    .defineClass(purpuredItemClassName,
-                    getClassByteArray(originalClass));
+            objectClass = (Class<A>) DynamicRegistries.dynamicRegistriesDynamicClassLoader
+                    .defineClass(className,
+                            getClassByteArray(childClass, parentClass));
         }
 
-        classMap.put(originalClass, purpuredItemClass);
+        classMap.put(childClass, objectClass);
 
-        return purpuredItemClass;
+        return objectClass;
     }
 
     @SuppressWarnings("unused") // Used by Generated Classes
-    public <A extends O> Object[] createConstructorParameters(Class<A> originalClass, A original) {
-        Constructor<A> constructor = getSelectedConstructor(originalClass);
+    public <C extends P> Object[] createConstructorParameters(Class<C> childClass, C child) {
+        Constructor<C> constructor = getSelectedConstructor(childClass);
         Object[] result = new Object[constructor.getParameterCount()];
         for (int index = 0; index < result.length; index++) {
             if (constructor.getParameterTypes()[index] == byte.class) {
@@ -201,7 +201,7 @@ public class DynamicRegistriesObjectHelper<O> {
             } else if (constructor.getParameterTypes()[index] == boolean.class) {
                 result[index] = new BooleanWrapper(false);
             } else if (this.constructorArguments.apply(constructor) != null) {
-                result[index] = this.constructorArguments.apply(constructor).apply(original);
+                result[index] = this.constructorArguments.apply(constructor).apply(child);
             } else {
                 result[index] = null;
             }
@@ -209,33 +209,23 @@ public class DynamicRegistriesObjectHelper<O> {
         return result;
     }
 
-    public <A extends O> Constructor<A> getSelectedConstructor(Class<A> originalClass) {
-        if (selectedConstructor.containsKey(originalClass)) {
-            return (Constructor<A>) selectedConstructor.get(originalClass);
+    public <C extends P> Constructor<C> getSelectedConstructor(Class<C> childClass) {
+        if (selectedConstructor.containsKey(childClass)) {
+            return (Constructor<C>) selectedConstructor.get(childClass);
         }
 
-        return selectConstructor(originalClass);
+        return selectConstructor(childClass);
     }
 
-    private <A extends O> Constructor<A> selectConstructor(Class<A> originalClass) {
-        Constructor<A>[] constructors = (Constructor<A>[]) originalClass.getDeclaredConstructors();
+    private <C extends P> Constructor<C> selectConstructor(Class<C> childClass) {
+        Constructor<C>[] constructors = (Constructor<C>[]) childClass.getDeclaredConstructors();
         if (constructors.length == 0)
-            throw new IllegalArgumentException("Class " + originalClass + " does not contain any constructors " +
+            throw new IllegalArgumentException("Class " + childClass + " does not contain any constructors " +
                     "(should not be possible, is someone messing with bytecode?)");
         int sizeOfMinimumSizedConstructor = Integer.MAX_VALUE;
         int indexOfMinimumSizedConstructor = 0;
         for (int index = 0; index < constructors.length; index++) {
-            Constructor<A> constructor = constructors[index];
-            /*
-            Class<?>[] parameterTypes = constructor.getParameterTypes();
-            if (parameterTypes.length == 1 && parameterTypes[0] == Item.Properties.class) {
-                return constructor;
-            }
-            if (parameterTypes.length == 2 && parameterTypes[0] == Block.class
-                    && parameterTypes[1] == Item.Properties.class) {
-                return constructor;
-            }
-            */
+            Constructor<C> constructor = constructors[index];
             if (this.constructorArguments.apply(constructor) != null) {
                 return constructor;
             }
@@ -245,18 +235,19 @@ public class DynamicRegistriesObjectHelper<O> {
             }
         }
 
-        Constructor<A> constructor = constructors[indexOfMinimumSizedConstructor];
-        selectedConstructor.put(originalClass, constructor);
+        Constructor<C> constructor = constructors[indexOfMinimumSizedConstructor];
+        selectedConstructor.put(childClass, constructor);
         return constructor;
     }
 
-    public <A extends O> boolean isObject(Class<A> aClass) {
-        return classMap.containsValue(aClass);
+    @SuppressWarnings("unused")
+    public <C extends P> boolean isObject(Class<C> classToCheck) {
+        return classMap.containsValue(classToCheck);
     }
 
     public static final class DynamicRegistriesDynamicClassLoader extends ClassLoader {
         public DynamicRegistriesDynamicClassLoader(ClassLoader parent) {
-            super( "DynamicRegistriesDynamicClassLoader of " + parent.getName() + "@" +
+            super("DynamicRegistriesDynamicClassLoader of " + parent.getName() + "@" +
                     Integer.toHexString(parent.hashCode()), parent);
         }
 

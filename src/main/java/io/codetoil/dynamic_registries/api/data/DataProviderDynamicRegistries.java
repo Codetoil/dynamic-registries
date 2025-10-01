@@ -19,6 +19,7 @@ import java.util.concurrent.CompletableFuture;
 public record DataProviderDynamicRegistries<O>(PackOutput output,
                                                CompletableFuture<HolderLookup.Provider> registries,
                                                BiMap<O, O> objectMap,
+                                               Class<O> parentClass,
                                                DynamicRegistriesObjectHelper<O> dynamicRegistriesObjectHelper)
         implements DataProvider {
 
@@ -36,7 +37,7 @@ public record DataProviderDynamicRegistries<O>(PackOutput output,
                                 assert o != null;
                                 return (Class<O>) o.getClass();
                             }),
-                    dynamicRegistriesObjectHelper::getClassByteArray);
+                    childClass -> dynamicRegistriesObjectHelper.getClassByteArray(childClass, parentClass));
             DynamicRegistries.LOGGER.info("Finished generating {}", dynamicRegistriesObjectHelper.getId());
 
             return DataProvider.saveAll(cachedOutput, Codec.list(Codec.BYTE), (object) ->
