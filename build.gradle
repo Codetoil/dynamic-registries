@@ -184,7 +184,10 @@ dependencies {
     // This maps to ./libs/coolmod-${mc_version}-${coolmod_version}.jar
     // The group id is ignored when searching -- in this case, it is "blank"
     // implementation fg.deobf("blank:coolmod-${mc_version}:${coolmod_version}")
-    minecraftLibrary(fg.deobf("io.codetoil:dynamic-registries-transformer:" + mod_version))
+
+    // Use when developing mod, remove when commiting
+    // implementation(fg.deobf("io.codetoil:dynamic-registries-transformer:" + mod_version))
+
     jarJar(group: 'io.codetoil', name: 'dynamic-registries-transformer', version: dynamic_registries_transformer_range)
 
     // For more info:
