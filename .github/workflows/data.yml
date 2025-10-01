@@ -16,11 +16,10 @@ jobs:
           distribution: 'temurin'
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew jar
-        env:
-          DR_KEY: ${{ secrets.DR_KEY }}
       - name: runGameTestServer
         run: ./gradlew runData
+        env:
+          DR_KEY: ${{ secrets.DR_KEY }}
       - name: capture data generation
         uses: actions/upload-artifact@v4
         with:
