@@ -185,7 +185,7 @@ dependencies {
     // The group id is ignored when searching -- in this case, it is "blank"
     // implementation fg.deobf("blank:coolmod-${mc_version}:${coolmod_version}")
 
-    // Use when developing mod, remove when commiting
+    // Use when developing mod, remove when commiting (Band-aid Fix)
     // implementation(fg.deobf("io.codetoil:dynamic-registries-transformer:" + mod_version))
 
     jarJar(group: 'io.codetoil', name: 'dynamic-registries-transformer', version: dynamic_registries_transformer_range)
