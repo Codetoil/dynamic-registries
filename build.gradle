@@ -202,11 +202,6 @@ sourceSets.each {
 
 
 publishing {
-    publications {
-        gpr(MavenPublication) {
-            artifact jar
-        }
-    }
     repositories {
         maven {
             name = "GitHubPackages"
@@ -215,6 +210,11 @@ publishing {
                 username = project.findProperty("gpr.user") ?: System.getenv("USERNAME")
                 password = project.findProperty("gpr.key") ?: System.getenv("TOKEN")
             }
+        }
+    }
+    publications {
+        gpr(MavenPublication) {
+            artifact jar
         }
     }
 }
