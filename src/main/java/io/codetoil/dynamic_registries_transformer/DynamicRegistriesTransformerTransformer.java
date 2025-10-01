@@ -1,4 +1,4 @@
-package io.codetoil.dynamic_registries_core.transform;
+package io.codetoil.dynamic_registries_transformer;
 
 import com.google.common.collect.Lists;
 import cpw.mods.modlauncher.api.ITransformer;
@@ -12,7 +12,7 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.function.Predicate;
 
-public record DynamicRegistriesCoreTransformer<T>(Predicate<String> isTopLevelParent) implements ITransformer<T> {
+public record DynamicRegistriesTransformerTransformer<T>(Predicate<String> isTopLevelParent) implements ITransformer<T> {
 
     @Override
     public @NotNull T transform(T input, ITransformerVotingContext context) {

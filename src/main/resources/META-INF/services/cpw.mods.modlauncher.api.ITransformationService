@@ -1,1 +1,1 @@
-io.codetoil.dynamic_registries_core.transform.DynamicRegistriesCoreTransformationService
+io.codetoil.dynamic_registries_transformer.DynamicRegistriesTransformerTransformationService

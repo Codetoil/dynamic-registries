@@ -1,4 +1,4 @@
-package io.codetoil.dynamic_registries_core.transform;
+package io.codetoil.dynamic_registries_transformer;
 
 import cpw.mods.modlauncher.api.IEnvironment;
 import cpw.mods.modlauncher.api.ITransformationService;
@@ -9,7 +9,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.List;
 import java.util.Set;
 
-public class DynamicRegistriesCoreTransformationService implements ITransformationService {
+public class DynamicRegistriesTransformerTransformationService implements ITransformationService {
     @Override
     public @NotNull String name() {
         return "Dynamic Registries Core Transformation Service";
