@@ -41,16 +41,8 @@ public class DynamicRegistriesObjectHelper<P> {
         return generateClassByteArray(originalClass);
     }
 
-    private void visitConstructorFrame(MethodVisitor constructorVisitor, List<Object> frameLocals,
-                                       Stack<Object> frameStack) {
-        Object[] frameLocalsArray = frameLocals.stream().filter(Objects::nonNull).toArray();
-        Object[] frameStackArray = frameStack.toArray();
-        constructorVisitor.visitFrame(Opcodes.F_NEW, frameLocalsArray.length, frameLocalsArray,
-                frameStackArray.length, frameStackArray);
-    }
-
     private <C extends P> byte[] generateClassByteArray(Class<C> childClass) {
-        ClassWriter classWriter = new ClassWriter(0);
+        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
 
         classWriter.visit(
                 Opcodes.V21,
@@ -59,7 +51,7 @@ public class DynamicRegistriesObjectHelper<P> {
                         "/Dynamic" + childClass.getName().replace('.', '_')
                         .replace('$', '_'),
                 null,
-                childClass.getName().replace('.', '/'),
+                Type.getInternalName(childClass),
                 new String[]{});
 
         MethodVisitor constructorVisitor = classWriter.visitMethod(
@@ -76,159 +68,91 @@ public class DynamicRegistriesObjectHelper<P> {
         constructorVisitor.visitLocalVariable("constructorParameters", Object[].class.descriptorString(),
                 null, startConstructorParameters, endConstructorParameters, 2);
 
-        List<Object> frameLocalTypes = new ArrayList<>(3);
-        frameLocalTypes.addLast(null);
-        frameLocalTypes.addLast(null);
-        frameLocalTypes.addLast(null);
-        Stack<Object> frameStackTypes = new Stack<>();
-
         constructorVisitor.visitCode();
-        frameLocalTypes.set(0, Opcodes.UNINITIALIZED_THIS);
-        frameLocalTypes.set(1, Type.getInternalName(childClass));
 
         constructorVisitor.visitVarInsn(Opcodes.ALOAD, 0);
-        frameStackTypes.push(frameLocalTypes.getFirst());
-        visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
 
         constructorVisitor.visitLdcInsn(Type.getType(childClass));
-        frameStackTypes.push(Type.getInternalName(childClass));
-        visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
 
         constructorVisitor.visitVarInsn(Opcodes.ALOAD, 1);
-        frameStackTypes.push(frameLocalTypes.get(1));
-        visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
 
         constructorVisitor.visitMethodInsn(Opcodes.INVOKESTATIC,
-                "io/codetoil/dynamic_registries/DynamicRegistriesObjectHelper",
+                "io/codetoil/dynamic_registries/api/DynamicRegistriesObjectHelper",
                 "createConstructorParameters",
-                "(Ljava/lang/Class<" + childClass.descriptorString() + ">;"
-                        + childClass.descriptorString() + ")[Ljava/lang/Object;",
+                "(Ljava/lang/Class;" + childClass.descriptorString() + ")[Ljava/lang/Object;",
                 false);
-        frameStackTypes.pop();
-        frameStackTypes.pop();
-        frameStackTypes.push(Type.getInternalName(Object[].class));
-        visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
 
         constructorVisitor.visitLabel(startConstructorParameters);
         constructorVisitor.visitVarInsn(Opcodes.ASTORE, 2);
-        frameLocalTypes.set(2, frameStackTypes.pop());
-        visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
 
         for (int index = 0; index < getSelectedConstructor(childClass).getParameterCount(); index++) {
             constructorVisitor.visitVarInsn(Opcodes.ALOAD, 2);
-            frameStackTypes.push(frameLocalTypes.get(2));
-            visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
 
             constructorVisitor.visitIntInsn(Opcodes.SIPUSH, index); // Limited to Short.MAX_VALUE parameters.
-            frameStackTypes.push(Opcodes.INTEGER);
-            visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
 
             constructorVisitor.visitInsn(Opcodes.AALOAD);
-            frameStackTypes.pop();
-            frameStackTypes.pop();
-            frameStackTypes.push(Type.getInternalName(Object.class));
-            visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
 
-            constructorVisitor.visitTypeInsn(Opcodes.CHECKCAST, getSelectedConstructor(childClass)
-                    .getParameterTypes()[index].getName().replace('.', '/'));
-            frameStackTypes.pop();
-            frameStackTypes.push(Type.getInternalName(getSelectedConstructor(childClass)
+            constructorVisitor.visitTypeInsn(Opcodes.CHECKCAST, Type.getInternalName(getSelectedConstructor(childClass)
                     .getParameterTypes()[index]));
-            visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
 
             switch (getSelectedConstructor(childClass).getParameterTypes()[index].getName()) {
-                case "io.codetoil.dynamicregistries.DynamicRegistriesObjectHelper$ByteWrapper":
+                case "io.codetoil.dynamic_registries.api.api.DynamicRegistriesObjectHelper$ByteWrapper":
                     constructorVisitor.visitMethodInsn(Opcodes.INVOKESPECIAL,
-                            "io/codetoil/dynamic_registries/DynamicRegistriesObjectHelper$ByteWrapper",
+                            "io/codetoil/dynamic_registries/api/DynamicRegistriesObjectHelper$ByteWrapper",
                             "value",
                             "()B",
                             false);
-                    frameStackTypes.pop();
-                    frameStackTypes.push(10); // boolean Frane,ITEM_ASM_BYTE
-                    visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
-                case "io.codetoil.dynamicregistries.DynamicRegistriesObjectHelper$ShortWrapper":
+                case "io.codetoil.dynamic_registries.api.DynamicRegistriesObjectHelper$ShortWrapper":
                     constructorVisitor.visitMethodInsn(Opcodes.INVOKESPECIAL,
-                            "io/codetoil/dynamic_registries/DynamicRegistriesObjectHelper$ShortWrapper",
+                            "io/codetoil/dynamic_registries/api/DynamicRegistriesObjectHelper$ShortWrapper",
                             "value",
                             "()S",
                             false);
-                    frameStackTypes.pop();
-                    frameStackTypes.push(12); // short, Frame.ITEM_ASM_SHORT
-                    visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
-                case "io.codetoil.dynamicregistries.DynamicRegistriesObjectHelper$IntWrapper":
+                case "io.codetoil.dynamic_registries.api.DynamicRegistriesObjectHelper$IntWrapper":
                     constructorVisitor.visitMethodInsn(Opcodes.INVOKESPECIAL,
-                            "io/codetoil/dynamic_registries/DynamicRegistriesObjectHelper$IntWrapper",
+                            "io/codetoil/dynamic_registries/api/DynamicRegistriesObjectHelper$IntWrapper",
                             "value",
                             "()I",
                             false);
-                    frameStackTypes.pop();
-                    frameStackTypes.push(Opcodes.INTEGER);
-                    visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
-                case "io.codetoil.dynamicregistries.DynamicRegistriesObjectHelper$LongWrapper":
                     constructorVisitor.visitMethodInsn(Opcodes.INVOKESPECIAL,
-                            "io/codetoil/dynamic_registries/DynamicRegistriesObjectHelper$LongWrapper",
+                            "io/codetoil/dynamic_registries/api/DynamicRegistriesObjectHelper$LongWrapper",
                             "value",
                             "()J",
                             false);
-                    frameStackTypes.pop();
-                    frameStackTypes.push(Opcodes.LONG);
-                    visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
-                case "io.codetoil.dynamicregistries.DynamicRegistriesObjectHelper$CharWrapper":
+                case "io.codetoil.dynamic_registries.api.DynamicRegistriesObjectHelper$CharWrapper":
                     constructorVisitor.visitMethodInsn(Opcodes.INVOKESPECIAL,
-                            "io/codetoil/dynamic_registries/DynamicRegistriesObjectHelper$CharWrapper",
+                            "io/codetoil/dynamic_registries/api/DynamicRegistriesObjectHelper$CharWrapper",
                             "value",
                             "()C",
                             false);
-                    frameStackTypes.pop();
-                    frameStackTypes.push(11); // char Frame.ITEM_ASM_CHAR
-                    visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
-                case "io.codetoil.dynamicregistries.DynamicRegistriesObjectHelper$FloatWrapper":
                     constructorVisitor.visitMethodInsn(Opcodes.INVOKESPECIAL,
-                            "io/codetoil/dynamic_registries/DynamicRegistriesObjectHelper$FloatWrapper",
+                            "io/codetoil/dynamic_registries/api/DynamicRegistriesObjectHelper$FloatWrapper",
                             "value",
                             "()F",
                             false);
-                    frameStackTypes.pop();
-                    frameStackTypes.push(Opcodes.FLOAT);
-                    visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
-                case "io.codetoil.dynamicregistries.DynamicRegistriesObjectHelper$DoubleWrapper":
+                case "io.codetoil.dynamic_registries.api.DynamicRegistriesObjectHelper$DoubleWrapper":
                     constructorVisitor.visitMethodInsn(Opcodes.INVOKESPECIAL,
-                            "io/codetoil/dynamic_registries/DynamicRegistriesObjectHelper$DoubleWrapper",
+                            "io/codetoil/dynamic_registries/api/DynamicRegistriesObjectHelper$DoubleWrapper",
                             "value",
                             "()D",
                             false);
-                    frameStackTypes.pop();
-                    frameStackTypes.push(Opcodes.DOUBLE);
-                    visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
-                case "io.codetoil.dynamicregistries.DynamicRegistriesObjectHelper$BooleanWrapper":
+                case "io.codetoil.dynamic_registries.api.DynamicRegistriesObjectHelper$BooleanWrapper":
                     constructorVisitor.visitMethodInsn(Opcodes.INVOKESPECIAL,
-                            "io/codetoil/dynamic_registries/DynamicRegistriesObjectHelper$BooleanWrapper",
+                            "io/codetoil/dynamic_registries/api/DynamicRegistriesObjectHelper$BooleanWrapper",
                             "getValue",
                             "()Z",
                             false);
-                    frameStackTypes.pop();
-                    frameStackTypes.push(9); // boolean, Frame.ITEM_ASM_BOOLEAN
-                    visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
-                default:
-                    frameStackTypes.pop();
-                    frameStackTypes.push(Type.getInternalName(getSelectedConstructor(childClass)
-                            .getParameterTypes()[index]));
-                    visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
             }
         }
         constructorVisitor.visitLabel(endConstructorParameters);
 
         constructorVisitor.visitMethodInsn(Opcodes.INVOKESPECIAL,
-                childClass.getName().replace('.', '/'),
+                Type.getInternalName(childClass),
                 "<init>",
                 "(" +
                         Arrays.stream(getSelectedConstructor(childClass).getParameterTypes())
                                 .map(Class::descriptorString).collect(Collectors.joining()) + ")V",
                 false);
-        frameStackTypes.pop(); // this
-        Arrays.stream(getSelectedConstructor(childClass).getParameterTypes())
-                .forEach((a) -> frameStackTypes.pop());
-        visitConstructorFrame(constructorVisitor, frameLocalTypes, frameStackTypes);
 
         constructorVisitor.visitInsn(Opcodes.RETURN);
         constructorVisitor.visitMaxs(10 + getSelectedConstructor(childClass).getParameterCount(), 3);
