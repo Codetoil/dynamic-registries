@@ -10,7 +10,7 @@ group = 'io.codetoil'
 version = '0.1.0-SNAPSHOT'
 
 base {
-    archivesName = 'dynamic_registries_transformer'
+    archivesName = 'dynamic-registries-transformer'
 }
 
 java {
