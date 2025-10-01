@@ -1,0 +1,25 @@
+name: data
+on: [pull_request, push]
+
+jobs:
+  data:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v5
+      - name: validate gradle wrapper
+        uses: gradle/actions/wrapper-validation@v3
+      - name: setup jdk
+        uses: actions/setup-java@v5
+        with:
+          java-version: 21
+          distribution: 'temurin'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+      - name: runGameTestServer
+        run: ./gradlew runData
+      - name: capture data generation
+        uses: actions/upload-artifact@v4
+        with:
+          name: Artifacts
+          path: src/generated/
