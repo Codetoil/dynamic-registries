@@ -6,10 +6,15 @@ import cpw.mods.modlauncher.api.ITransformer;
 import cpw.mods.modlauncher.api.IncompatibleEnvironmentException;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.ServiceLoader;
 import java.util.Set;
 
 public class DynamicRegistriesTransformerTransformationService implements ITransformationService {
+
+    List<ITransformer> transformers = new ArrayList<>();
+
     @Override
     public @NotNull String name() {
         return "Dynamic Registries Transformer Transformation Service";
@@ -22,11 +27,10 @@ public class DynamicRegistriesTransformerTransformationService implements ITrans
 
     @Override
     public void onLoad(IEnvironment env, Set<String> otherServices) throws IncompatibleEnvironmentException {
-
     }
 
     @Override
     public @NotNull List<ITransformer> transformers() {
-        return List.of();
+        return transformers;
     }
 }
