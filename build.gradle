@@ -176,7 +176,7 @@ dependencies {
     // The group id is ignored when searching -- in this case, it is "blank"
     // implementation fg.deobf("blank:coolmod-${mc_version}:${coolmod_version}")
 
-    runtimeOnly(fg.deobf("io.codetoil:dynamic-registries-transformer:" + dynamic_registries_transformer_version))
+    implementation(fg.deobf("io.codetoil:dynamic-registries-transformer:" + dynamic_registries_transformer_version))
 
     // For more info:
     // http://www.gradle.org/docs/current/userguide/artifact_dependencies_tutorial.html
