@@ -13,6 +13,7 @@ import org.objectweb.asm.*;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.*;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -21,10 +22,10 @@ public class DynamicRegistriesObjectHelper<P> {
     private final Map<Class<? extends P>, byte[]> byteArrayMap = Maps.newHashMap();
     private final Map<Class<? extends P>, Constructor<? extends P>> selectedConstructor
             = Maps.newHashMap();
-    private final Function<Constructor<? extends P>, Function<P, Object>> constructorArguments;
+    private final BiFunction<Constructor<? extends P>, Integer, Function<P, ?>> constructorArguments;
     private final ResourceLocation id;
 
-    public DynamicRegistriesObjectHelper(Function<Constructor<? extends P>, Function<P, Object>>
+    public DynamicRegistriesObjectHelper(BiFunction<Constructor<? extends P>, Integer, Function<P, ?>>
                                                  constructorArguments, ResourceLocation id) {
         this.constructorArguments = constructorArguments;
         this.id = id;
@@ -57,44 +58,37 @@ public class DynamicRegistriesObjectHelper<P> {
         MethodVisitor constructorVisitor = classWriter.visitMethod(
                 Opcodes.ACC_PUBLIC,
                 "<init>",
-                "(" + childClass.descriptorString() + ")V",
+                "(" + childClass.descriptorString()
+                        + DynamicRegistriesObjectHelper.class.descriptorString() + ")V",
                 null,
                 null);
 
         Label startConstructorParameters = new Label();
         Label endConstructorParameters = new Label();
-        constructorVisitor.visitLineNumber(5, startConstructorParameters);
-        constructorVisitor.visitLineNumber(6, endConstructorParameters);
         constructorVisitor.visitLocalVariable("constructorParameters", Object[].class.descriptorString(),
-                null, startConstructorParameters, endConstructorParameters, 2);
+                null, startConstructorParameters, endConstructorParameters, 3);
 
         constructorVisitor.visitCode();
 
         constructorVisitor.visitVarInsn(Opcodes.ALOAD, 0);
 
+        constructorVisitor.visitVarInsn(Opcodes.ALOAD, 2);
         constructorVisitor.visitLdcInsn(Type.getType(childClass));
-
         constructorVisitor.visitVarInsn(Opcodes.ALOAD, 1);
-
-        constructorVisitor.visitMethodInsn(Opcodes.INVOKESTATIC,
+        constructorVisitor.visitMethodInsn(Opcodes.INVOKEVIRTUAL,
                 "io/codetoil/dynamic_registries/api/DynamicRegistriesObjectHelper",
                 "createConstructorParameters",
-                "(Ljava/lang/Class;" + childClass.descriptorString() + ")[Ljava/lang/Object;",
+                "(Ljava/lang/Class;Ljava/lang/Object;)[Ljava/lang/Object;",
                 false);
-
         constructorVisitor.visitLabel(startConstructorParameters);
-        constructorVisitor.visitVarInsn(Opcodes.ASTORE, 2);
+        constructorVisitor.visitVarInsn(Opcodes.ASTORE, 3);
 
         for (int index = 0; index < getSelectedConstructor(childClass).getParameterCount(); index++) {
-            constructorVisitor.visitVarInsn(Opcodes.ALOAD, 2);
-
+            constructorVisitor.visitVarInsn(Opcodes.ALOAD, 3);
             constructorVisitor.visitIntInsn(Opcodes.SIPUSH, index); // Limited to Short.MAX_VALUE parameters.
-
             constructorVisitor.visitInsn(Opcodes.AALOAD);
-
             constructorVisitor.visitTypeInsn(Opcodes.CHECKCAST, Type.getInternalName(getSelectedConstructor(childClass)
                     .getParameterTypes()[index]));
-
             switch (getSelectedConstructor(childClass).getParameterTypes()[index].getName()) {
                 case "io.codetoil.dynamic_registries.api.api.DynamicRegistriesObjectHelper$ByteWrapper":
                     constructorVisitor.visitMethodInsn(Opcodes.INVOKESPECIAL,
@@ -209,8 +203,8 @@ public class DynamicRegistriesObjectHelper<P> {
                 result[index] = new DoubleWrapper(0.0);
             } else if (constructor.getParameterTypes()[index] == boolean.class) {
                 result[index] = new BooleanWrapper(false);
-            } else if (this.constructorArguments.apply(constructor) != null) {
-                result[index] = this.constructorArguments.apply(constructor).apply(child);
+            } else if (this.constructorArguments.apply(constructor, index) != null) {
+                result[index] = this.constructorArguments.apply(constructor, index).apply(child);
             } else {
                 result[index] = null;
             }
@@ -235,7 +229,7 @@ public class DynamicRegistriesObjectHelper<P> {
         int indexOfMinimumSizedConstructor = 0;
         for (int index = 0; index < constructors.length; index++) {
             Constructor<C> constructor = constructors[index];
-            if (this.constructorArguments.apply(constructor) != null) {
+            if (this.constructorArguments.apply(constructor, index) != null) {
                 return constructor;
             }
             if (constructor.getParameterCount() < sizeOfMinimumSizedConstructor) {
