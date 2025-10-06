@@ -18,8 +18,6 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
       - name: runGameTestServer
         run: ./gradlew runData
-        env:
-          DR_KEY: ${{ secrets.DR_KEY }}
       - name: capture data generation
         uses: actions/upload-artifact@v4
         with:
