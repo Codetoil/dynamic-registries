@@ -22,12 +22,25 @@ sourceSets {
             srcDir "src/transformer/resources"
         }
     }
+
+    both {
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+        compileClasspath += sourceSets.transformer.output
+        runtimeClasspath += sourceSets.transformer.output
+    }
 }
 
 configurations {
     transformerImplementation.extendsFrom(implementation)
     transformerRuntimeOnly.extendsFrom(runtimeOnly)
+    transformerAnnotationProcessor.extendsFrom(annotationProcessor)
     transformerMinecraft.extendsFrom(minecraft)
+
+    bothImplementation.extendsFrom(implementation, transformerImplementation)
+    bothRuntimeOnly.extendsFrom(runtimeOnly, transformerRuntimeOnly)
+    bothAnnotationProcessor.extendsFrom(annotationProcessor, transformerAnnotationProcessor)
+    bothMinecraft.extendsFrom(minecraft, transformerMinecraft)
 }
 
 // Mojang ships Java 21 to end users in 1.20.5+, so your mod should target Java 21.
@@ -196,24 +209,19 @@ dependencies {
     // If the group id is "net.minecraft" and the artifact id is one of ["client", "server", "joined"],
     // then special handling is done to allow a setup of a vanilla dependency without the use of an external repository.
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
-
-    // Example mod dependency with JEI - using fg.deobf() ensures the dependency is remapped to your development mappings
-    // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
-    // compileOnly fg.deobf("mezz.jei:jei-${mc_version}-common-api:${jei_version}")
-    // compileOnly fg.deobf("mezz.jei:jei-${mc_version}-forge-api:${jei_version}")
-    // runtimeOnly fg.deobf("mezz.jei:jei-${mc_version}-forge:${jei_version}")
+    transformerMinecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+    bothMinecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
     // Forge 1.21.6+ uses EventBus 7, which shifts most of its runtime validation to compile-time via an annotation processor
     // to improve performance in production environments. This line is required to enable said compile-time validation
     // in your development environment, helping you catch issues early.
     annotationProcessor "net.minecraftforge:eventbus-validator:${event_bus_validator_version}"
+    transformerAnnotationProcessor "net.minecraftforge:eventbus-validator:${event_bus_validator_version}"
+    bothAnnotationProcessor "net.minecraftforge:eventbus-validator:${event_bus_validator_version}"
 
     // For more info:
     // http://www.gradle.org/docs/current/userguide/artifact_dependencies_tutorial.html
     // http://www.gradle.org/docs/current/userguide/dependency_management.html
-
-    // Hack fix for now, force jopt-simple to be exactly 5.0.4 because Mojang ships that version, but some transtive dependencies request 6.0+
-    implementation('net.sf.jopt-simple:jopt-simple:5.0.4') { version { strictly '5.0.4' } }
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.
@@ -232,6 +240,24 @@ tasks.named('processResources', ProcessResources).configure {
     filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
         expand replaceProperties + [project: project]
     }
+}
+
+tasks.named('processTestResources', ProcessResources).configure {
+    var replaceProperties = [minecraft_version   : minecraft_version, minecraft_version_range: minecraft_version_range,
+                             forge_version       : forge_version, forge_version_range: forge_version_range,
+                             loader_version_range: loader_version_range,
+                             mod_id              : mod_id, mod_name: mod_name, mod_license: mod_license, mod_version: mod_version,
+                             mod_authors         : mod_authors, mod_description: mod_description,]
+
+    inputs.properties replaceProperties
+
+    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+        expand replaceProperties + [project: project]
+    }
+}
+
+tasks.named('processTransformerResources', ProcessResources).configure {
+    duplicatesStrategy = DuplicatesStrategy.WARN
 }
 
 // Example for how to get properties into the manifest for reading at runtime.

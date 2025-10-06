@@ -1,4 +1,4 @@
-package io.codetoil.dynamic_registries_transformer;
+package io.codetoil.dynamic_registries.transformer;
 
 import cpw.mods.modlauncher.api.IEnvironment;
 import cpw.mods.modlauncher.api.ITransformationService;

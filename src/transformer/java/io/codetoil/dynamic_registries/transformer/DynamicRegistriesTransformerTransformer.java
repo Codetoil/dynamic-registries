@@ -1,4 +1,4 @@
-package io.codetoil.dynamic_registries_transformer;
+package io.codetoil.dynamic_registries.transformer;
 
 import com.google.common.collect.Lists;
 import cpw.mods.modlauncher.api.ITransformer;
@@ -6,16 +6,17 @@ import cpw.mods.modlauncher.api.ITransformerVotingContext;
 import cpw.mods.modlauncher.api.TransformerVoteResult;
 import org.jetbrains.annotations.NotNull;
 import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.tree.ClassNode;
 
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Set;
 import java.util.function.Predicate;
 
-public record DynamicRegistriesTransformerTransformer<T>(Predicate<String> isTopLevelParent) implements ITransformer<T> {
+public record DynamicRegistriesTransformerTransformer(Predicate<String> isTopLevelParent) implements ITransformer<ClassNode> {
 
     @Override
-    public @NotNull T transform(T input, ITransformerVotingContext context) {
+    public @NotNull ClassNode transform(ClassNode input, ITransformerVotingContext context) {
         return input;
     }
 
