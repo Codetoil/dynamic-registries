@@ -87,12 +87,6 @@ minecraft {
         configureEach {
             workingDirectory project.file('run')
 
-            mods {
-                "${mod_id}_transformer_test_mod" {
-                    source sourceSets.test
-                }
-            }
-
             // Recommended logging data for a userdev environment
             // The markers can be added/remove as needed separated by commas.
             // "SCAN": For mods scan.
@@ -114,16 +108,20 @@ minecraft {
                 "${mod_id}" {
                     source sourceSets.main
                 }
+
+                "${mod_id}_transformer_test_mod" {
+                    source sourceSets.test
+                }
             }
         }
 
         client {
             // Comma-separated list of namespaces to load gametests from. Empty = all namespaces.
-            property 'forge.enabledGameTestNamespaces', mod_id, "${mod_id}_transformer_test_mod"
+            property 'forge.enabledGameTestNamespaces', "${mod_id},${mod_id}_transformer_test_mod"
         }
 
         server {
-            property 'forge.enabledGameTestNamespaces', mod_id, "${mod_id}_transformer_test_mod"
+            property 'forge.enabledGameTestNamespaces', "${mod_id},${mod_id}_transformer_test_mod"
             args '--nogui'
         }
 
@@ -131,7 +129,7 @@ minecraft {
         // By default, the server will crash when no gametests are provided.
         // The gametest system is also enabled by default for other run configs under the /test command.
         gameTestServer {
-            property 'forge.enabledGameTestNamespaces', mod_id, "${mod_id}_transformer_test_mod"
+            property 'forge.enabledGameTestNamespaces', "${mod_id},${mod_id}_transformer_test_mod"
         }
 
         data {
@@ -139,7 +137,8 @@ minecraft {
             workingDirectory project.file('run-data')
 
             // Specify the modid for data generation, where to output the resulting resource, and where to look for existing resources.
-            args '--mod', mod_id, '--mod', "${mod_id}_transformer_test_mod", '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
+            args '--mod', mod_id, '--mod', "${mod_id}_transformer_test_mod", '--all', '--output',
+                    file('src/generated/resources/'), '--existing', file('src/main/resources/')
         }
     }
 }
@@ -185,7 +184,6 @@ repositories {
         }
     }*/
     mavenLocal()
-}
     flatDir {
          dir './libs'
     }
@@ -208,12 +206,7 @@ dependencies {
     // Forge 1.21.6+ uses EventBus 7, which shifts most of its runtime validation to compile-time via an annotation processor
     // to improve performance in production environments. This line is required to enable said compile-time validation
     // in your development environment, helping you catch issues early.
-    annotationProcessor 'net.minecraftforge:eventbus-validator:7.0-beta.10'
-
-    // Example mod dependency using a mod jar from ./libs with a flat dir repository
-    // This maps to ./libs/coolmod-${mc_version}-${coolmod_version}.jar
-    // The group id is ignored when searching -- in this case, it is "blank"
-    implementation fg.deobf("blank:examplemod-1.0.0")
+    annotationProcessor "net.minecraftforge:eventbus-validator:${event_bus_validator_version}"
 
     // For more info:
     // http://www.gradle.org/docs/current/userguide/artifact_dependencies_tutorial.html
